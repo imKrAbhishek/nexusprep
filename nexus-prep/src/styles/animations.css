@@ -1,0 +1,54 @@
+/* styles/animations.css
+   WHY THIS FILE EXISTS:
+   Complex keyframe animations that are too verbose for tailwind.config.js
+   live here. Import in index.css with: @import './styles/animations.css'
+*/
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes scalePop {
+  0%   { transform: scale(0.95); opacity: 0; }
+  70%  { transform: scale(1.02); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+/* Utility classes — use these in JSX className */
+.animate-fade-up    { animation: fadeUp     0.5s ease forwards; }
+.animate-fade-in    { animation: fadeIn     0.4s ease forwards; }
+.animate-slide-left { animation: slideInLeft 0.4s ease forwards; }
+.animate-scale-pop  { animation: scalePop   0.35s ease forwards; }
+
+/* Stagger delays for lists */
+.delay-50  { animation-delay:  50ms; }
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* Skeleton loading shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #f1f3f8 25%, #e5e8f0 50%, #f1f3f8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
