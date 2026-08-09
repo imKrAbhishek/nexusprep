@@ -1,116 +1,177 @@
-// Settings.jsx — User account settings page
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { User, Bell, Upload, Save } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { User, Bell, Shield, Save } from "lucide-react";
-const EXAM_OPTIONS = [
-  { value: "GATE", label: "GATE" },
-  { value: "JEE", label: "JEE" },
-  { value: "CAT", label: "CAT" },
-  { value: "Placement", label: "Placements" },
-  { value: "UPSC", label: "UPSC" }
-];
-export default function Settings() {
-  const { user } = useAuth();
-  const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    // Later: PUT /api/user/settings
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+export default function Settings() {
+  const { user, updateUser } = useAuth();
+  const fileInputRef = useRef(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize form with user context data
+  const [formData, setFormData] = useState({
+    fullName: user?.fullName || "",
+    email: user?.email || "",
+    targetExam: user?.targetExam || "",
+    phoneNumber: user?.phoneNumber || "",
+    avatar: user?.avatar || null,
+  });
+
+  const [notifications, setNotifications] = useState({
+    liveClass: true,
+    quizResults: true,
+  });
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Handle Image Upload & Preview
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, avatar: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    // Update global context so photo appears everywhere
+    if (updateUser) {
+      await updateUser({ ...user, ...formData });
+    }
+    
+    setTimeout(() => {
+      setIsSaving(false);
+      alert("Settings saved successfully!");
+    }, 500);
   };
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 font-display">Settings</h2>
+        <h1 className="text-3xl font-bold text-gray-900 font-display">Settings</h1>
         <p className="text-gray-500 mt-1">Manage your profile and preferences.</p>
       </div>
 
-      {/* Profile settings */}
-      <div className="card p-6 space-y-5">
-        <h3 className="font-bold text-gray-900 flex items-center gap-2"><User className="w-5 h-5 text-brand-500" /> Profile</h3>
-
-        {/* Avatar */}
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold">{user?.avatar}</div>
-          <div>
-            <button className="btn-outline py-1.5 px-4 text-sm">Change Photo</button>
-            <p className="text-xs text-gray-400 mt-1">JPG, PNG up to 2MB</p>
-          </div>
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-6 md:p-8">
+        <div className="flex items-center gap-2 mb-6 border-b border-surface-200 pb-4">
+          <User className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-lg font-bold text-gray-900">Profile</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-            <input defaultValue={user?.name} className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input defaultValue={user?.email} type="email" className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Target Exam</label>
-            <select className="input appearance-none">
-              {EXAM_OPTIONS.filter(o => o.value).map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number</label>
-            <input placeholder="+91 98765 43210" className="input" />
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      <div className="card p-6 space-y-4">
-        <h3 className="font-bold text-gray-900 flex items-center gap-2"><Bell className="w-5 h-5 text-brand-500" /> Notifications</h3>
-        {[
-          ["Live class reminders", "Get notified 15 minutes before a live class"],
-          ["Quiz & test results", "Instant notification when results are published"],
-          ["New course recommendations", "Weekly personalized course suggestions"],
-          ["Platform announcements", "Important updates from NexusPrep"],
-        ].map(([label, desc]) => (
-          <div key={label} className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-900">{label}</p>
-              <p className="text-xs text-gray-400">{desc}</p>
+        <form onSubmit={handleSave} className="space-y-6">
+          {/* Avatar Upload */}
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-xl bg-indigo-100 flex items-center justify-center overflow-hidden border-2 border-indigo-50">
+              {formData.avatar ? (
+                <img src={formData.avatar} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-8 h-8 text-indigo-400" />
+              )}
             </div>
-            {/* Toggle */}
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
-              <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-10 h-5 bg-gray-200 peer-checked:bg-brand-600 rounded-full transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
-            </label>
+            <div>
+              <input 
+                type="file" 
+                accept="image/png, image/jpeg" 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handlePhotoUpload} 
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 transition-colors"
+              >
+                <Upload className="w-4 h-4" /> Change Photo
+              </button>
+              <p className="text-xs text-gray-400 mt-2">JPG, PNG up to 2MB</p>
+            </div>
           </div>
-        ))}
+
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <input
+                type="text"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Target Exam</label>
+              <input
+                type="text"
+                name="targetExam"
+                value={formData.targetExam}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <input
+                type="text"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-70"
+            >
+              <Save className="w-4 h-4" />
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
       </div>
 
-      {/* Security */}
-      <div className="card p-6 space-y-4">
-        <h3 className="font-bold text-gray-900 flex items-center gap-2"><Shield className="w-5 h-5 text-brand-500" /> Security</h3>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Current Password</label>
-          <input type="password" placeholder="••••••••" className="input" />
+      {/* Notifications Section */}
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-6 md:p-8">
+        <div className="flex items-center gap-2 mb-6 border-b border-surface-200 pb-4">
+          <Bell className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
-            <input type="password" placeholder="Min. 8 characters" className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm New Password</label>
-            <input type="password" placeholder="Repeat new password" className="input" />
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="font-medium text-gray-900">Live class reminders</p>
+              <p className="text-sm text-gray-500">Get notified 15 minutes before a live class</p>
+            </div>
+            <button 
+              onClick={() => setNotifications({...notifications, liveClass: !notifications.liveClass})}
+              className={`w-11 h-6 rounded-full transition-colors relative ${notifications.liveClass ? 'bg-indigo-600' : 'bg-gray-200'}`}
+            >
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${notifications.liveClass ? 'left-6' : 'left-1'}`} />
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Save button */}
-      <div className="flex items-center gap-4">
-        <button onClick={handleSave} className="btn-primary px-8">
-          <Save className="w-4 h-4" /> {saved ? "Saved!" : "Save Changes"}
-        </button>
-        {saved && <span className="text-emerald-500 text-sm font-medium">✓ Changes saved successfully</span>}
       </div>
     </div>
   );

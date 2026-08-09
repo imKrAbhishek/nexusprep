@@ -2,7 +2,7 @@
 // Navbar.jsx — Top navigation bar
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, ChevronDown, LayoutDashboard, BookOpen, LogOut, User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -14,7 +14,22 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // 100% Crash-Proof Name & Role Extraction based on new backend schema
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const safeName = user?.fullName || "User";
   const firstName = safeName.split(" ")[0];
   const initial = firstName.charAt(0).toUpperCase() || "U";
@@ -34,7 +49,6 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* ── Logo ── */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-glow transition-all">
               <span className="text-white font-bold text-sm font-mono">NP</span>
@@ -42,24 +56,29 @@ export default function Navbar() {
             <span className="text-xl font-bold text-gray-900 font-display">NexusPrep</span>
           </Link>
 
-          {/* ── Desktop Nav Links ── */}
+          {/* 🔥 FIXED: Now pointing to actual pages instead of hash links */}
           <div className="hidden md:flex items-center gap-1">
             <NavItem to="/catalog" label="Courses" />
-            <NavItem to="/#features" label="Features" />
-            <NavItem to="/#testimonials" label="Success Stories" />
+            <NavItem to="/features" label="Features" />
+            <NavItem to="/success-stories" label="Success Stories" />
           </div>
 
-          {/* ── Auth Controls ── */}
           <div className="hidden md:flex items-center gap-3">
             {isLoggedIn ? (
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 bg-surface-50 border border-surface-200 hover:border-brand-300 rounded-full py-1.5 pl-1.5 pr-3 transition-all"
                 >
-                  <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-white text-xs font-bold">{initial}</span>
+                  
+                  <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center shadow-sm overflow-hidden border border-brand-200">
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-xs font-bold">{initial}</span>
+                    )}
                   </div>
+
                   <div className="flex flex-col text-left hidden sm:flex">
                     <span className="text-sm font-bold text-gray-900 leading-none truncate max-w-[100px]">{firstName}</span>
                     <span className="text-[10px] text-brand-600 font-bold uppercase tracking-wider leading-none mt-0.5">{userRole}</span>
@@ -75,7 +94,13 @@ export default function Navbar() {
                     </div>
                     <DropItem icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" onClick={() => { navigate("/dashboard"); setProfileOpen(false); }} />
                     <DropItem icon={<BookOpen className="w-4 h-4" />} label="My Courses" onClick={() => { navigate("/dashboard/courses"); setProfileOpen(false); }} />
-                    <DropItem icon={<User className="w-4 h-4" />} label="Profile" onClick={() => setProfileOpen(false)} />
+                    
+                    <DropItem 
+                      icon={<User className="w-4 h-4" />} 
+                      label="Profile" 
+                      onClick={() => { navigate("/dashboard/settings"); setProfileOpen(false); }} 
+                    />
+                    
                     <div className="border-t border-surface-100 mt-1 pt-1">
                       <DropItem icon={<LogOut className="w-4 h-4" />} label="Logout" onClick={handleLogout} danger />
                     </div>
@@ -90,17 +115,19 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* ── Mobile Hamburger ── */}
           <button className="md:hidden p-2 rounded-lg" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* ── Mobile Menu ── */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t border-surface-200 px-4 py-4 space-y-2">
           <MobileNavItem to="/catalog" label="Courses" onClick={() => setMenuOpen(false)} />
+          {/* 🔥 FIXED MOBILE MENU AS WELL */}
+          <MobileNavItem to="/features" label="Features" onClick={() => setMenuOpen(false)} />
+          <MobileNavItem to="/success-stories" label="Success Stories" onClick={() => setMenuOpen(false)} />
+          
           {isLoggedIn
             ? <>
                 <MobileNavItem to="/dashboard" label="Dashboard" onClick={() => setMenuOpen(false)} />
@@ -141,5 +168,5 @@ function MobileNavItem({ to, label, onClick }) {
     <Link to={to} onClick={onClick} className="block px-4 py-3 text-gray-700 font-medium hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all">
       {label}
     </Link>
-  );
+  ); 
 }

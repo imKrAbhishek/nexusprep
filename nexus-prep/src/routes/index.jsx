@@ -19,6 +19,11 @@ const AiDoubts        = lazy(() => import('../pages/dashboard/AiDoubts'));
 const Settings        = lazy(() => import('../pages/dashboard/Settings'));
 const Classroom       = lazy(() => import('../pages/dashboard/Classroom'));
 const TakeQuiz        = lazy(() => import('../pages/dashboard/TakeQuiz'));
+const Features        = lazy(() => import('../pages/public/Features'));
+const SuccessStories  = lazy(() => import('../pages/public/SuccessStories'));
+
+// 🔥 NEW: Import the StaticPage component
+const StaticPage      = lazy(() => import('../pages/public/StaticPage'));
 
 // Admin Pages
 const AdminDashboard  = lazy(() => import('../pages/admin/AdminDashboard'));
@@ -41,7 +46,20 @@ export default function AppRoutes() {
         <Route path={ROUTES.LOGIN}         element={<LoginPage />} />
         <Route path={ROUTES.SIGNUP}        element={<SignupPage />} />
         <Route path={ROUTES.CATALOG}       element={<CourseCatalog />} />
-        <Route path={ROUTES.COURSE_DETAIL()} element={<CourseDetail />} />
+        {/* Make sure ROUTES.COURSE_DETAIL is invoked properly based on your constants file */}
+        <Route path="/course/:id"          element={<CourseDetail />} />
+        <Route path="/features"            element={<Features />} />
+        <Route path="/success-stories"     element={<SuccessStories />} />
+
+        {/* 🔥 NEW: Static/Footer Pages routed to the Under Construction component */}
+        <Route path="/about"               element={<StaticPage />} />
+        <Route path="/careers"             element={<StaticPage />} />
+        <Route path="/blog"                element={<StaticPage />} />
+        <Route path="/press"               element={<StaticPage />} />
+        <Route path="/partner"             element={<StaticPage />} />
+        <Route path="/privacy"             element={<StaticPage />} />
+        <Route path="/terms"               element={<StaticPage />} />
+        <Route path="/refund-policy"       element={<StaticPage />} />
 
         {/* ── Protected Student Dashboard ── */}
         <Route
@@ -53,17 +71,17 @@ export default function AppRoutes() {
           }
         >
           <Route index element={<DashboardHome />} />
-          <Route path={ROUTES.DASHBOARD_COURSES.split('/').pop()}  element={<MyCourses />} />
-          <Route path={ROUTES.DASHBOARD_QUIZZES.split('/').pop()}  element={<Quizzes />} />
-          <Route path={ROUTES.DASHBOARD_AI.split('/').pop()}       element={<AiDoubts />} />
-          <Route path={ROUTES.DASHBOARD_SETTINGS.split('/').pop()} element={<Settings />} />
+          <Route path={ROUTES.DASHBOARD_COURSES?.split('/').pop() || "courses"}  element={<MyCourses />} />
+          <Route path={ROUTES.DASHBOARD_QUIZZES?.split('/').pop() || "quizzes"}  element={<Quizzes />} />
+          <Route path={ROUTES.DASHBOARD_AI?.split('/').pop() || "ai"}       element={<AiDoubts />} />
+          <Route path={ROUTES.DASHBOARD_SETTINGS?.split('/').pop() || "settings"} element={<Settings />} />
           <Route path="classroom/:id" element={<Classroom />} />
           <Route path="take-quiz/:id" element={<TakeQuiz />} />
         </Route>
 
         {/* ── Protected Admin Portal ── */}
         <Route
-          path={ROUTES.ADMIN}
+          path={ROUTES.ADMIN} // Usually this equals "/dashboard/teacher" or "/admin"
           element={
             <AdminRoute>
               <DashboardLayout />
@@ -72,7 +90,9 @@ export default function AppRoutes() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="courses" element={<AdminDashboard />} />
-          <Route path="courses/:courseId/edit" element={<CourseEditor />} />
+          
+          {/* 🔥 THE FIX: This now perfectly matches the URL /course/12345 */}
+          <Route path="course/:courseId" element={<CourseEditor />} />
         </Route>
 
         {/* ── 404 ── */}

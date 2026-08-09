@@ -23,7 +23,8 @@ const quizSchema = new mongoose.Schema(
     },
     category: {
       type:    String,
-      enum:    ['JEE', 'GATE', 'Placement', 'CAT', 'UPSC', 'General'],
+      // 🔥 FIX 1: Added 'Self-Practice' and 'Lecture Quiz' to the allowed list
+      enum:    ['JEE', 'GATE', 'Placement', 'CAT', 'UPSC', 'General', 'Self-Practice', 'Lecture Quiz'],
       default: 'General',
     },
     source: {

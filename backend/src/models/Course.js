@@ -24,7 +24,24 @@ const courseSchema = new mongoose.Schema(
     instructorName:   { type: String, default: '' },
     instructorAvatar: { type: String, default: '' },
     instructorBio:    { type: String, default: '' },
-    category:    { type: String, required: true, enum: ['JEE','GATE','Placement','CAT','UPSC'] },
+    category:    { 
+      type: String, 
+      required: true, 
+      // 🔥 FIX: Expanded the enum to match your frontend dropdown options exactly
+      enum: [
+        'JEE', 
+        'JEE Mains', 
+        'GATE', 
+        'GATE CS', 
+        'GATE EE', 
+        'Placement', 
+        'Placements', 
+        'CAT', 
+        'UPSC', 
+        'Web Development',
+        'General'
+      ] 
+    },
     level:       { type: String, enum: ['Beginner','Intermediate','Advanced'], default: 'Beginner' },
     price:       { type: Number, required: true, min: 0 },
     originalPrice: { type: Number, min: 0 },

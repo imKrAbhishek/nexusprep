@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useGoogleLogin } from '@react-oauth/google';
+import { api } from '../../services/api';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,7 +12,7 @@ export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Eye Toggle State
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,6 +32,28 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  // Google Login Flow
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await api.post('/auth/google', {
+          access_token: tokenResponse.access_token,
+        });
+        
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+          window.location.href = '/dashboard'; 
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || "Google login failed on server.");
+        setLoading(false);
+      }
+    },
+    onError: () => setError("Google Login window closed or failed."),
+  });
 
   return (
     <div className="min-h-screen bg-surface-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -64,7 +88,7 @@ export default function Login() {
                   name="email"
                   type="email"
                   required
-                  pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                  pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                   title="Please enter a valid email address"
                   className="w-full pl-10 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all"
                   placeholder="you@example.com"
@@ -108,7 +132,7 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Google Login Mockup */}
+          {/* Google Login Section */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -120,12 +144,15 @@ export default function Login() {
             </div>
 
             <div className="mt-6">
+              {/* 🔥 PREMIUM STYLED GOOGLE BUTTON */}
               <button
-                onClick={() => alert("Google OAuth integration coming in v2.0!")}
-                className="w-full flex justify-center items-center gap-3 py-2.5 px-4 border border-surface-200 rounded-xl shadow-sm bg-white text-sm font-bold text-gray-700 hover:bg-surface-50 transition-colors"
+                type="button"
+                onClick={() => loginWithGoogle()}
+                disabled={loading}
+                className="w-full flex justify-center items-center gap-3 py-2.5 px-4 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:bg-gray-50 hover:border-gray-300 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-                Google
+                Continue with Google
               </button>
             </div>
           </div>

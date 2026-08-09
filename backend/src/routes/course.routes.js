@@ -1,4 +1,3 @@
-// backend/src/routes/course.routes.js
 const express   = require('express');
 const router    = express.Router();
 const { protect, restrictTo } = require('../middleware/auth.middleware');
@@ -7,37 +6,49 @@ const {
   getAdminCourses, getAdminCourseById, createCourse, updateCourse, publishCourse,
   addModule, updateModule, deleteModule,
   addLecture, updateLecture, deleteLecture,
+  deleteCourse
 } = require('../controllers/course.controller');
 
-// ── 1. Admin / Teacher Routes (MUST GO FIRST) ──────────────────────────
-const adminRouter = express.Router({ mergeParams: true });
-adminRouter.use(protect, restrictTo('admin', 'teacher'));
+// ── 1. Specific & Admin Routes (MUST GO FIRST) ──────────
 
-adminRouter.get('/',       getAdminCourses);
-adminRouter.post('/',      createCourse);
-adminRouter.get('/:id',    getAdminCourseById);
-adminRouter.put('/:id',    updateCourse);
-adminRouter.patch('/:id/publish', publishCourse);
-
-adminRouter.post(  '/:id/modules',            addModule);
-adminRouter.put(   '/:id/modules/:moduleId', updateModule);
-adminRouter.delete('/:id/modules/:moduleId', deleteModule);
-
-adminRouter.post(  '/:id/modules/:moduleId/lectures',             addLecture);
-adminRouter.put(   '/:id/modules/:moduleId/lectures/:lectureId', updateLecture);
-adminRouter.delete('/:id/modules/:moduleId/lectures/:lectureId', deleteLecture);
-
-// Mount the admin router BEFORE the /:id routes
-router.use('/admin', adminRouter);
-
-// ── 2. Public & Student routes ─────────────────────────────────────────
-router.get('/',    getCourses);
-router.get('/enrollments/me',             protect, getMyEnrollments);
-router.post('/enrollments',               protect, enrollInCourse);
+// Student Enrollments
+router.get('/enrollments/me', protect, getMyEnrollments);
+router.post('/enrollments', protect, enrollInCourse);
 router.patch('/enrollments/:id/progress', protect, updateProgress);
 
-// ── 3. Parameterized Route (MUST GO LAST) ──────────────────────────────
-// This is now fully public and crash-proof. 
-router.get('/:id', getCourseById);
+// Reusable Middleware Array for Teachers/Admins
+const teacherOnly = [protect, restrictTo('admin', 'teacher')];
+
+// Admin / Teacher Specific Fetches
+router.get('/admin', teacherOnly, getAdminCourses);
+router.get('/admin/:id', teacherOnly, getAdminCourseById);
+
+// 🔥 THE FIX: Added '/admin' to all content management routes to match frontend
+router.patch('/admin/:id/publish', teacherOnly, publishCourse);
+
+// Modules
+router.post('/admin/:id/modules', teacherOnly, addModule);
+router.put('/admin/:id/modules/:moduleId', teacherOnly, updateModule);
+router.delete('/admin/:id/modules/:moduleId', teacherOnly, deleteModule);
+
+// Lectures
+router.post('/admin/:id/modules/:moduleId/lectures', teacherOnly, addLecture);
+router.put('/admin/:id/modules/:moduleId/lectures/:lectureId', teacherOnly, updateLecture);
+router.delete('/admin/:id/modules/:moduleId/lectures/:lectureId', teacherOnly, deleteLecture);
+
+
+// ── 2. Standard REST Routes ──────────────────────────────────────────────
+
+router.route('/')
+  .get(getCourses) // Public: Get all courses
+  .post(teacherOnly, createCourse); // Teacher: Create new course
+
+
+// ── 3. Parameterized Routes (MUST GO LAST) ───────────────────────────────
+
+router.route('/:id')
+  .get(getCourseById) // Public: Get single course
+  .put(teacherOnly, updateCourse) // Teacher: Update course details
+  .delete(teacherOnly, deleteCourse); // Teacher: Delete course
 
 module.exports = router;

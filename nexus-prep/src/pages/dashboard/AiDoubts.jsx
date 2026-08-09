@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Brain, Send, Sparkles, Loader, ChevronDown, ChevronUp, BookOpen, MessageSquare, AlertCircle, RefreshCw } from 'lucide-react';import { aiService } from '../../services/aiService';
+import { Brain, Send, Sparkles, Loader, ChevronDown, ChevronUp, BookOpen, MessageSquare, AlertCircle, RefreshCw } from 'lucide-react';
+import { aiService } from '../../services/aiService';
 
 const SAMPLE_QUESTIONS = [
   'Explain the concept of moment of inertia with examples.',
@@ -19,6 +20,34 @@ export default function AiDoubts() {
   const [subject, setSubject]         = useState('General');
   const chatEndRef                    = useRef(null);
 
+  // ── ON MOUNT: Load History & Classroom Context ──
+  useEffect(() => {
+    // 1. Restore chat history
+    const savedChat = localStorage.getItem("nexus_ai_chat_history");
+    if (savedChat) {
+      try {
+        setChat(JSON.parse(savedChat));
+      } catch (e) {
+        console.error("Failed to parse saved chat history");
+      }
+    }
+
+    // 2. Load RAG context if user clicked "Ask AI" in Classroom
+    const activeContext = localStorage.getItem("nexus_rag_context");
+    if (activeContext) {
+      setContext(activeContext);
+      setShowContext(true); // Automatically open the context panel so the user sees it
+    }
+  }, []);
+
+  // ── ON UPDATE: Save History to Browser ──
+  useEffect(() => {
+    if (chat.length > 0) {
+      localStorage.setItem("nexus_ai_chat_history", JSON.stringify(chat));
+    }
+  }, [chat]);
+
+  // Scroll to bottom when chat updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat, loading]);
@@ -35,7 +64,7 @@ export default function AiDoubts() {
     try {
       const result = await aiService.askDoubt({
         question:  text,
-        context,
+        context:   context, // Sends the Classroom notes directly to Gemini
         sessionId,
         subject,
       });
@@ -55,6 +84,10 @@ export default function AiDoubts() {
     setSessionId(null);
     setError('');
     setQuestion('');
+    setContext('');
+    // Clear storage so it's a completely fresh start
+    localStorage.removeItem("nexus_ai_chat_history");
+    localStorage.removeItem("nexus_rag_context");
   };
 
   const handleKey = (e) => {
@@ -62,7 +95,7 @@ export default function AiDoubts() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-4 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 font-display flex items-center gap-2">
@@ -80,7 +113,7 @@ export default function AiDoubts() {
         )}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
         <button
           onClick={() => setShowContext(!showContext)}
           className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium text-gray-700 hover:bg-surface-50 transition-all"
@@ -88,7 +121,7 @@ export default function AiDoubts() {
           <span className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-brand-400" />
             Paste course notes for better answers (optional — RAG context)
-            {context && <span className="badge bg-emerald-100 text-emerald-600 ml-1">Active</span>}
+            {context && <span className="bg-emerald-100 text-emerald-600 text-xs px-2 py-0.5 rounded-full font-bold ml-1">Active</span>}
           </span>
           {showContext ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
@@ -105,7 +138,7 @@ export default function AiDoubts() {
                 <select
                   value={subject}
                   onChange={e => setSubject(e.target.value)}
-                  className="input text-sm py-2"
+                  className="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   {['General','JEE Physics','JEE Chemistry','JEE Maths','GATE CS','GATE EE','Placement'].map(s => (
                     <option key={s}>{s}</option>
@@ -118,7 +151,7 @@ export default function AiDoubts() {
               onChange={e => setContext(e.target.value)}
               placeholder="Paste your lecture notes, topic summary, or any relevant text here..."
               rows={5}
-              className="input resize-none text-sm font-mono"
+              className="w-full p-3 bg-surface-50 border border-surface-200 rounded-lg resize-none text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             {context && (
               <div className="flex items-center justify-between">
@@ -126,14 +159,14 @@ export default function AiDoubts() {
                   ✓ {context.length} characters of context loaded
                 </p>
                 <button onClick={() => setContext('')}
-                  className="text-xs text-red-400 hover:text-red-600">Clear</button>
+                  className="text-xs text-red-400 hover:text-red-600 font-medium">Clear Context</button>
               </div>
             )}
           </div>
         )}
       </div>
 
-      <div className="card p-4 min-h-80 max-h-[480px] overflow-y-auto space-y-4 scroll-smooth">
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-4 min-h-[320px] max-h-[480px] overflow-y-auto space-y-4 scroll-smooth">
         {chat.length === 0 && (
           <div className="text-center py-8">
             <Sparkles className="w-10 h-10 mx-auto mb-3 text-brand-300" />
@@ -209,13 +242,13 @@ export default function AiDoubts() {
           onKeyDown={handleKey}
           placeholder="Type your doubt here… (Enter to send, Shift+Enter for new line)"
           rows={2}
-          className="input flex-1 resize-none text-sm"
+          className="w-full p-3 bg-white border border-surface-200 rounded-xl resize-none text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
           disabled={loading}
         />
         <button
           onClick={() => ask()}
           disabled={loading || !question.trim()}
-          className="bg-brand-600 text-white rounded-xl px-5 self-end disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-700 py-3"
+          className="bg-brand-600 text-white rounded-xl px-5 self-end disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-700 py-3 transition-colors shadow-sm"
         >
           {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>

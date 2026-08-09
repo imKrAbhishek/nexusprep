@@ -28,6 +28,13 @@ export function AuthProvider({ children }) {
         const response = await authService.getMe();
         const validUser = extractUser(response);
         if (validUser && validUser.email) {
+          
+          // ADD THIS: Check for a saved avatar in local storage
+          const savedAvatar = localStorage.getItem('nexus_avatar');
+          if (savedAvatar) {
+            validUser.avatar = savedAvatar;
+          }
+
           setUser(validUser);
         } else {
           setUser(null);
@@ -71,7 +78,32 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-const value = { user, login, signup, register: signup, logout, isLoggedIn: !!user, loading };
+  // ADDED: updateUser function to handle state changes from the Settings page
+ const updateUser = useCallback((updatedData) => {
+    setUser((prevUser) => {
+      const newUser = { ...prevUser, ...updatedData };
+      
+      // ADD THIS: Save the avatar to local storage
+      if (newUser.avatar) {
+        localStorage.setItem('nexus_avatar', newUser.avatar);
+      }
+      
+      return newUser;
+    });
+  }, []);
+
+  // ADDED: Included updateUser in the exposed context values
+  const value = { 
+    user, 
+    login, 
+    signup, 
+    register: signup, 
+    logout, 
+    updateUser, 
+    isLoggedIn: !!user, 
+    loading 
+  };
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

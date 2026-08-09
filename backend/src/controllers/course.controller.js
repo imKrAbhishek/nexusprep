@@ -1,6 +1,7 @@
 // backend/src/controllers/course.controller.js
 const asyncHandler  = require('../utils/asyncHandler');
 const courseService = require('../services/course.service');
+const Course = require('../models/Course'); // Safely import model for deletion
 
 // ─── STUDENT CONTROLLERS ─────────────────────
 const getCourses = asyncHandler(async (req,res) => {
@@ -10,9 +11,7 @@ const getCourses = asyncHandler(async (req,res) => {
 
 const getCourseById = asyncHandler(async (req,res) => {
   try {
-    // Safely check if a user exists, otherwise pass null
     const userId = (req.user && req.user._id) ? req.user._id : null;
-    
     const course = await courseService.getCourseById(req.params.id, userId);
     
     if (!course) {
@@ -21,7 +20,6 @@ const getCourseById = asyncHandler(async (req,res) => {
     
     res.status(200).json({success:true,data:{course}});
   } catch (error) {
-    // This catches database errors and safely sends them to the frontend
     console.error("Error fetching course details:", error);
     res.status(500).json({ 
       success: false, 
@@ -61,14 +59,60 @@ const getAdminCourseById = asyncHandler(async (req,res) => {
   res.status(200).json({success:true,data:{course}});
 });
 
-const createCourse = asyncHandler(async (req,res) => {
-  const course = await courseService.createCourse(req.body, req.user);
-  res.status(201).json({success:true,message:'Course draft created',data:{course}});
-});
+const createCourse = async (req, res) => {
+  try {
+    req.body.instructor = req.user._id;
+    
+    if (!req.body.description) req.body.description = 'Course details coming soon.';
+    if (!req.body.level) req.body.level = 'Beginner';
+    if (!req.body.color) req.body.color = 'from-brand-500 to-purple-600';
+
+    const course = await courseService.createCourse(req.body, req.user);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Course draft created',
+      data: { course }
+    });
+  } catch (error) {
+    console.error("\n=== 🔥 MONGOOSE REJECTION DETAILS ===");
+    console.error(error);
+    console.error("=====================================\n");
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Database validation failed',
+      errorDetails: error.errors || {}
+    });
+  }
+};
 
 const updateCourse = asyncHandler(async (req,res) => {
   const course = await courseService.updateCourse(req.params.id, req.body);
   res.status(200).json({success:true,message:'Course updated',data:{course}});
+});
+
+// 🔥 THE NEW DELETE FUNCTION
+const deleteCourse = asyncHandler(async (req, res) => {
+  const course = await courseService.getAdminCourseById(req.params.id);
+  
+  if (!course) {
+    return res.status(404).json({ success: false, message: 'Course not found' });
+  }
+
+  if (course.isPublished) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Cannot delete a published course. Please unpublish it first.' 
+    });
+  }
+
+  await Course.findByIdAndDelete(req.params.id);
+
+  res.status(200).json({ 
+    success: true, 
+    message: 'Draft course deleted successfully' 
+  });
 });
 
 const publishCourse = asyncHandler(async (req,res) => {
@@ -106,9 +150,10 @@ const deleteLecture = asyncHandler(async (req,res) => {
   res.status(200).json({success:true,...result});
 });
 
+// 🔥 EXPORTING DELETE COURSE
 module.exports = {
   getCourses, getCourseById, enrollInCourse, getMyEnrollments, updateProgress,
-  getAdminCourses, getAdminCourseById, createCourse, updateCourse, publishCourse,
+  getAdminCourses, getAdminCourseById, createCourse, updateCourse, deleteCourse, publishCourse,
   addModule, updateModule, deleteModule,
   addLecture, updateLecture, deleteLecture,
 };

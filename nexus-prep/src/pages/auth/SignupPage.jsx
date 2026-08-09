@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Loader, ArrowRight, Target } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useGoogleLogin } from '@react-oauth/google'; // Added Google Hook
+import { api } from '../../services/api'; // Added API
 
 export default function Signup() {
   const navigate = useNavigate();
   const { register } = useAuth();
   
-  // FIX 1: Changed "name" to "fullName" to perfectly match your backend controller
   const [formData, setFormData] = useState({ 
     fullName: '', 
     email: '', 
     password: '', 
-    role: 'admin', // Defaults to admin for your quick testing
+    role: 'admin',
     targetExam: 'GATE' 
   });
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,6 @@ export default function Signup() {
     setLoading(true);
     
     try {
-      // Sending the exact payload your backend expects
       await register(formData);
       navigate('/dashboard');
     } catch (err) {
@@ -39,6 +39,28 @@ export default function Signup() {
       setLoading(false);
     }
   };
+
+  // 🔥 Google Signup Flow (Same as Login, backend handles creation)
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await api.post('/auth/google', {
+          access_token: tokenResponse.access_token,
+        });
+        
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+          window.location.href = '/dashboard'; 
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || "Google registration failed on server.");
+        setLoading(false);
+      }
+    },
+    onError: () => setError("Google window closed or failed."),
+  });
 
   return (
     <div className="min-h-screen bg-surface-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -70,12 +92,12 @@ export default function Signup() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  name="fullName" // FIX: Now matches the state
+                  name="fullName"
                   type="text"
                   required
                   className="w-full pl-10 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all"
                   placeholder="John Doe"
-                  value={formData.fullName} // FIX: Now matches the state
+                  value={formData.fullName}
                   onChange={handleChange}
                 />
               </div>
@@ -90,7 +112,6 @@ export default function Signup() {
                   name="email"
                   type="email"
                   required
-                  // FIX 2: Removed the broken 'pattern' attribute completely
                   className="w-full pl-10 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all"
                   placeholder="you@example.com"
                   value={formData.email}
@@ -168,6 +189,32 @@ export default function Signup() {
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
+
+          {/* Google Signup Section */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500 font-medium">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              {/* 🔥 PREMIUM STYLED GOOGLE BUTTON */}
+              <button
+                type="button"
+                onClick={() => loginWithGoogle()}
+                disabled={loading}
+                className="w-full flex justify-center items-center gap-3 py-2.5 px-4 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:bg-gray-50 hover:border-gray-300 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-all duration-200 disabled:opacity-70"
+              >
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+                Continue with Google
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

@@ -32,7 +32,7 @@ const quizAttemptSchema = new mongoose.Schema(
   { timestamps: true, toJSON: { virtuals: true } }
 );
 
-quizAttemptSchema.index({ student: 1, quiz: 1 }, { unique: true });
+quizAttemptSchema.index({ student: 1, quiz: 1 });
 quizAttemptSchema.index({ student: 1, submittedAt: -1 });
 quizAttemptSchema.index({ quiz: 1 });
 

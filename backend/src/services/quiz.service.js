@@ -25,17 +25,36 @@ const getQuizById = async (quizId) => {
 };
 
 const generateAndSaveQuiz = async ({ title, context, category, courseId, difficulty }) => {
-  const questions = await aiService.generateQuiz(context, category, 5);
-  if (questions.length === 0) throw new AppError('AI could not generate valid questions.', 422);
+  let questions;
+  
+  // 1. Safely call the AI Service
+  try {
+    questions = await aiService.generateQuiz(context, category, 5);
+  } catch (error) {
+    throw new AppError(`AI Parsing Error: ${error.message}`, 502);
+  }
 
+  if (!questions || questions.length === 0) {
+    throw new AppError('AI could not generate valid questions.', 422);
+  }
+
+  // Force the category to be a valid enum
+  const allowedCategories = ['JEE', 'GATE', 'Placement', 'CAT', 'UPSC', 'General', 'Self-Practice', 'Lecture Quiz'];
+  const safeCategory = allowedCategories.includes(category) ? category : 'Self-Practice';
+
+  // Timer Logic: 2 minutes per generated question
+  const calculatedTimeLimit = questions.length * 2; 
+
+  // 2. Save to database
   return await Quiz.create({
-    title:                title || `${category} Quiz`,
+    title:                title || `${safeCategory} Quiz`,
     courseId:             courseId || null,
-    category:             category || 'General',
+    category:             safeCategory,
     source:               'ai-generated',
     generatedFromContext: context,
     questions,
     difficulty:           difficulty || 'Medium',
+    timeLimitMinutes:     calculatedTimeLimit,
     isPublished:          true,
   });
 };
@@ -44,20 +63,32 @@ const submitAttempt = async (quizId, userId, answers, timeTakenSeconds = 0) => {
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new AppError('Quiz not found', 404);
 
-  const existing = await QuizAttempt.findOne({ student: userId, quiz: quizId });
-  if (existing) throw new AppError('You have already attempted this quiz', 409);
+  // const existing = await QuizAttempt.findOne({ student: userId, quiz: quizId });
+  // if (existing) throw new AppError('You have already attempted this quiz', 409);
 
-  const scoredAnswers = answers.map(({ questionId, chosen }) => {
-    const question = quiz.questions.id(questionId);
-    if (!question) return null;
+  // Safely ensure answers is an array
+  const safeAnswers = Array.isArray(answers) ? answers : [];
+
+  // Grade the answers against the database
+  const scoredAnswers = quiz.questions.map((question) => {
+    // Look for the user's answer to this specific question
+    const submittedAns = safeAnswers.find(
+      (a) => a.questionId && a.questionId.toString() === question._id.toString()
+    );
+    
+    // Check if empty, null, or undefined, and default to 'SKIPPED'
+    const chosen = (submittedAns && submittedAns.chosen && submittedAns.chosen.trim() !== '') 
+      ? submittedAns.chosen.toUpperCase() 
+      : 'SKIPPED';
+
     return {
-      questionId,
-      chosen:      chosen?.toUpperCase() || '',
+      questionId:  question._id,
+      chosen:      chosen, 
       correct:     question.correctAnswer,
-      isCorrect:   chosen?.toUpperCase() === question.correctAnswer,
+      isCorrect:   chosen === question.correctAnswer, 
       explanation: question.explanation || '',
     };
-  }).filter(Boolean);
+  });
 
   const correctCount   = scoredAnswers.filter(a => a.isCorrect).length;
   const totalQuestions = quiz.questions.length;
@@ -81,7 +112,18 @@ const submitAttempt = async (quizId, userId, answers, timeTakenSeconds = 0) => {
 };
 
 const getMyAttempts = async (userId) => {
-  return QuizAttempt.find({ student: userId }).populate('quiz', 'title category difficulty').sort({ submittedAt: -1 }).limit(20).lean();
+  return QuizAttempt.find({ student: userId })
+    .populate('quiz', 'title category difficulty timeLimitMinutes')
+    .sort({ submittedAt: -1 })
+    .limit(20)
+    .lean();
 };
 
-module.exports = { getQuizzesByCourse, getQuizzesByCategory, getQuizById, generateAndSaveQuiz, submitAttempt, getMyAttempts };
+module.exports = { 
+  getQuizzesByCourse, 
+  getQuizzesByCategory, 
+  getQuizById, 
+  generateAndSaveQuiz, 
+  submitAttempt, 
+  getMyAttempts 
+};

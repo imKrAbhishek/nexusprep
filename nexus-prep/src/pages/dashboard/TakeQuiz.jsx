@@ -1,209 +1,227 @@
-// ============================================================
-// TakeQuiz.jsx — Interactive Quiz Engine
-// Handles taking the test, submitting, and reviewing AI explanations
-// ============================================================
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, XCircle, Brain, Loader, AlertCircle } from 'lucide-react';
-import { aiService } from '../../services/aiService';
+import { Clock, AlertCircle, ArrowLeft, Loader, CheckCircle } from 'lucide-react';
+import { api } from '../../services/api';
 
 export default function TakeQuiz() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   
-  // State for active quiz taking
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState({}); // { questionId: 'A' }
-  const [submitting, setSubmitting] = useState(false);
+  // Stores answers as { questionId: 'A' }
+  const [answers, setAnswers] = useState({});
   
-  // State for post-submission review
-  const [results, setResults] = useState(null);
+  // Timer State
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
 
+  // Use a ref to track if we've already auto-submitted to prevent infinite loops
+  const hasSubmitted = useRef(false);
+
+  // 1. Fetch Quiz Data
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const data = await aiService.getQuizById(id);
-        setQuiz(data);
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load quiz. You may have already attempted it.');
+        const res = await api.get(`/ai/quizzes/${id}`); // Adjust endpoint if needed
+        const fetchedQuiz = res.data?.data?.quiz || res.data?.quiz;
+        setQuiz(fetchedQuiz);
+        
+        // Initialize timer (fallback to 10 mins if backend didn't set it)
+        const minutes = fetchedQuiz.timeLimitMinutes || 10;
+        setTimeLeft(minutes * 60);
+      } catch (error) {
+        console.error("Failed to load quiz", error);
+        alert("Could not load quiz.");
+        navigate('/dashboard/quizzes');
       } finally {
         setLoading(false);
       }
     };
     fetchQuiz();
-  }, [id]);
+  }, [id, navigate]);
 
-  const handleSelectOption = (questionId, label) => {
-    if (results) return; // Prevent changing after submission
-    setAnswers(prev => ({ ...prev, [questionId]: label }));
-  };
+  // 2. Handle Countdown Timer
+  useEffect(() => {
+    if (timeLeft === null || isSubmitting || result) return;
 
-  const handleSubmit = async () => {
-    // Format answers for the backend: [{ questionId, chosen }]
-    const formattedAnswers = Object.keys(answers).map(qId => ({
-      questionId: qId,
-      chosen: answers[qId]
-    }));
-
-    if (formattedAnswers.length < quiz.questions.length) {
-      if (!window.confirm("You have unanswered questions. Submit anyway?")) return;
+    // 🔥 AUTO SUBMIT TRIGGER
+    if (timeLeft <= 0 && !hasSubmitted.current) {
+      hasSubmitted.current = true;
+      submitQuiz(true); // pass true to indicate it was an auto-submit
+      return;
     }
 
-    setSubmitting(true);
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft, isSubmitting, result]);
+
+  // Helper to format time (MM:SS)
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const handleOptionSelect = (questionId, optionLabel) => {
+    if (result || isSubmitting) return; // Prevent clicking after submit
+    setAnswers(prev => ({ ...prev, [questionId]: optionLabel }));
+  };
+
+  // 3. Submit Quiz Logic
+  const submitQuiz = async (isAutoSubmit = false) => {
+    if (hasSubmitted.current && !isAutoSubmit) return;
+    hasSubmitted.current = true;
+    setIsSubmitting(true);
+
     try {
-      const response = await aiService.submitQuiz(id, formattedAnswers, 0);
-      setResults(response); // Contains { attempt, questions (with explanations) }
-      setCurrentIndex(0); // Go back to first question for review
-    } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to submit quiz.');
+      // Format answers for the backend: [{ questionId: '...', chosen: 'A' }]
+      const formattedAnswers = Object.keys(answers).map(qId => ({
+        questionId: qId,
+        chosen: answers[qId]
+      }));
+
+      // Calculate time taken
+      const totalTimeSeconds = (quiz.timeLimitMinutes || 10) * 60;
+      const timeTaken = totalTimeSeconds - (timeLeft || 0);
+
+      // Send to backend
+      const res = await api.post(`/ai/quizzes/${id}/submit`, {
+        answers: formattedAnswers, // Perfectly safe, even if empty!
+        timeTakenSeconds: timeTaken
+      });
+
+      setResult(res.data?.data?.attempt || res.data?.attempt);
+      
+      if (isAutoSubmit) {
+        alert("Time is up! Your quiz has been automatically submitted.");
+      }
+    } catch (error) {
+      console.error("Submission failed", error);
+      alert(error.response?.data?.message || "Failed to submit quiz");
+      hasSubmitted.current = false; // Allow retry if it failed
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (loading) return <div className="flex-1 flex justify-center p-12"><Loader className="w-8 h-8 text-brand-500 animate-spin" /></div>;
-  if (error || !quiz) return <div className="p-8 text-center text-red-500"><AlertCircle className="w-10 h-10 mx-auto mb-3"/>{error}<br/><button onClick={() => navigate('/dashboard/quizzes')} className="text-brand-600 mt-4 underline">Go Back</button></div>;
-
-  const question = results ? results.questions[currentIndex] : quiz.questions[currentIndex];
-  const isLastQuestion = currentIndex === quiz.questions.length - 1;
-  const progressPercent = Math.round(((currentIndex + 1) / quiz.questions.length) * 100);
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      
-      {/* ── Header & Progress ── */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-surface-200">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => navigate('/dashboard/quizzes')} className="text-gray-400 hover:text-gray-900 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="font-bold text-gray-900 truncate px-4">{quiz.title}</h2>
-          <span className="text-sm font-semibold text-gray-500">
-            {currentIndex + 1} / {quiz.questions.length}
-          </span>
-        </div>
-        <div className="w-full bg-surface-100 rounded-full h-2 overflow-hidden">
-          <div className="bg-brand-500 h-2 transition-all duration-300" style={{ width: `${progressPercent}%` }}></div>
-        </div>
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
+        <Loader className="w-10 h-10 animate-spin text-brand-600 mb-4" />
+        <p className="font-bold text-gray-600">Loading your assessment...</p>
       </div>
+    );
+  }
 
-      {/* ── Results Banner (Shows only after submission) ── */}
-      {results && (
-        <div className={`p-6 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4 ${
-          results.attempt.isPassed ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
-        }`}>
-          <div>
-            <h3 className={`text-xl font-black ${results.attempt.isPassed ? 'text-emerald-700' : 'text-red-700'}`}>
-              {results.attempt.isPassed ? 'Quiz Passed!' : 'Quiz Failed'}
-            </h3>
-            <p className={`text-sm mt-1 ${results.attempt.isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
-              You answered {results.attempt.correctCount} out of {results.attempt.totalQuestions} correctly. Review the AI explanations below.
-            </p>
+  // ── RESULT VIEW ──
+  if (result) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 pt-12">
+        <div className="bg-white rounded-3xl p-8 border border-surface-200 shadow-sm text-center">
+          <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6 ${result.isPassed ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+            {result.isPassed ? <CheckCircle className="w-10 h-10" /> : <AlertCircle className="w-10 h-10" />}
           </div>
-          <div className="text-3xl font-black font-mono">
-            {results.attempt.score}%
-          </div>
-        </div>
-      )}
-
-      {/* ── Active Question Card ── */}
-      <div className="card p-6 md:p-8 shadow-sm">
-        <h3 className="text-lg font-medium text-gray-900 mb-6 leading-relaxed">
-          <span className="text-brand-500 font-bold mr-2">Q{currentIndex + 1}.</span> 
-          {question.text}
-        </h3>
-
-        <div className="space-y-3">
-          {question.options.map((opt) => {
-            const isSelected = answers[question._id] === opt.label;
-            
-            // Post-submission styling logic
-            let optionStyles = "border-surface-200 bg-white hover:border-brand-300 text-gray-700";
-            let OptionIcon = null;
-
-            if (results) {
-              const isCorrectAnswer = opt.label === question.correctAnswer;
-              const wasChosen = isSelected;
-
-              if (isCorrectAnswer) {
-                optionStyles = "border-emerald-500 bg-emerald-50 text-emerald-800 font-medium";
-                OptionIcon = <CheckCircle className="w-5 h-5 text-emerald-500" />;
-              } else if (wasChosen && !isCorrectAnswer) {
-                optionStyles = "border-red-400 bg-red-50 text-red-800";
-                OptionIcon = <XCircle className="w-5 h-5 text-red-500" />;
-              } else {
-                optionStyles = "border-surface-200 bg-surface-50 text-gray-400 opacity-60";
-              }
-            } else if (isSelected) {
-              // Active taking styling
-              optionStyles = "border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-500 font-medium";
-            }
-
-            return (
-              <button
-                key={opt.label}
-                onClick={() => handleSelectOption(question._id, opt.label)}
-                disabled={!!results}
-                className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all text-left ${optionStyles}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
-                    isSelected && !results ? 'bg-brand-500 text-white' : 'bg-surface-200 text-gray-600'
-                  }`}>
-                    {opt.label}
-                  </div>
-                  <span>{opt.text}</span>
-                </div>
-                {OptionIcon}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* AI Explanation Box (Only shown in review mode) */}
-        {results && question.explanation && (
-          <div className="mt-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl flex gap-3">
-            <Brain className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+          <h2 className="text-3xl font-black text-gray-900 mb-2">
+            {result.isPassed ? 'Congratulations!' : 'Keep Practicing!'}
+          </h2>
+          <p className="text-gray-500 mb-8">You scored {result.score}% on this assessment.</p>
+          
+          <div className="flex justify-center gap-8 mb-8 pb-8 border-b border-surface-100">
             <div>
-              <p className="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-1">AI Explanation</p>
-              <p className="text-sm text-indigo-900/80 leading-relaxed">{question.explanation}</p>
+              <p className="text-3xl font-bold text-gray-900">{result.correctCount} / {result.totalQuestions}</p>
+              <p className="text-sm font-medium text-gray-500">Correct Answers</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">{formatTime(result.timeTakenSeconds || 0)}</p>
+              <p className="text-sm font-medium text-gray-500">Time Taken</p>
             </div>
           </div>
-        )}
+
+          <button onClick={() => navigate('/dashboard/quizzes')} className="btn-primary px-8 py-3">
+            Back to Quizzes
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ACTIVE QUIZ VIEW ──
+  const isTimeLow = timeLeft < 60; // Turns red under 1 minute
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 md:p-6 pb-24">
+      {/* Header & Sticky Timer */}
+      <div className="sticky top-0 z-10 bg-surface-50/80 backdrop-blur-md pt-4 pb-4 mb-6 border-b border-surface-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-2 transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Exit Quiz
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900 font-display">{quiz?.title}</h1>
+        </div>
+        
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold font-mono text-lg transition-colors ${
+          isTimeLow ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-brand-100 text-brand-700'
+        }`}>
+          <Clock className="w-5 h-5" />
+          {formatTime(timeLeft)}
+        </div>
       </div>
 
-      {/* ── Navigation Controls ── */}
-      <div className="flex justify-between items-center pt-4">
+      {/* Questions List */}
+      <div className="space-y-8">
+        {quiz?.questions?.map((q, index) => (
+          <div key={q._id} className="bg-white rounded-3xl p-6 md:p-8 border border-surface-200 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex gap-3">
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-100 flex items-center justify-center text-sm text-gray-500">
+                {index + 1}
+              </span>
+              <span className="pt-1">{q.text}</span>
+            </h3>
+
+            <div className="space-y-3 pl-11">
+              {q.options.map((opt) => {
+                const isSelected = answers[q._id] === opt.label;
+                return (
+                  <button
+                    key={opt.label}
+                    onClick={() => handleOptionSelect(q._id, opt.label)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
+                      isSelected 
+                        ? 'border-brand-600 bg-brand-50' 
+                        : 'border-surface-200 hover:border-brand-300 hover:bg-surface-50'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                      isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 text-gray-500'
+                    }`}>
+                      {opt.label}
+                    </div>
+                    <span className={`font-medium ${isSelected ? 'text-brand-900' : 'text-gray-700'}`}>
+                      {opt.text}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Submit Button */}
+      <div className="mt-12 text-center">
         <button
-          onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-          disabled={currentIndex === 0}
-          className="btn-outline px-6 disabled:opacity-30 disabled:cursor-not-allowed"
+          onClick={() => submitQuiz(false)}
+          disabled={isSubmitting}
+          className="btn-primary px-12 py-4 text-lg w-full md:w-auto"
         >
-          Previous
+          {isSubmitting ? <Loader className="w-6 h-6 animate-spin mx-auto" /> : 'Submit Assessment'}
         </button>
-        
-        {!isLastQuestion ? (
-          <button
-            onClick={() => setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}
-            className="btn-primary px-8"
-          >
-            Next
-          </button>
-        ) : !results ? (
-          <button onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
-            {submitting ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-            Submit Quiz
-          </button>
-        ) : (
-          <button onClick={() => navigate('/dashboard/quizzes')} className="btn-primary px-8">
-            Finish Review
-          </button>
-        )}
       </div>
     </div>
   );
