@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PlayCircle, Clock, BookOpen, ArrowRight, Loader, ArrowLeft } from 'lucide-react';
 import { courseService } from '../../services/courseService';
 import { useAuth } from '../../context/AuthContext';
+// Import your API client
+import { api } from '../../services/api'; 
 
 export default function CourseDetail() {
   const { id } = useParams();
@@ -39,17 +41,36 @@ export default function CourseDetail() {
       navigate('/login');
       return;
     }
+    
     setEnrolling(true);
+    
     try {
-      await courseService.enrollStudent(id);
-      navigate('/dashboard/courses'); 
+      if (course.price > 0) {
+        // Trigger Stripe Checkout for paid courses
+        const response = await api.post('/payments/create-checkout', { courseId: id });
+        
+        // 🔥 FIX: Check both locations where the URL might be depending on your Axios config
+        const checkoutUrl = response.url || response.data?.url;
+        
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl; // Redirect to Stripe Checkout
+        } else {
+          console.error("Full response object:", response);
+          throw new Error('Failed to retrieve checkout URL');
+        }
+      } else {
+        // Free course logic
+        await courseService.enrollStudent(id);
+        navigate('/dashboard/courses'); 
+      }
     } catch (error) {
       const status = error.response?.status;
       const errorMsg = error.response?.data?.message?.toLowerCase() || '';
+      
       if (status === 409 || errorMsg.includes('already')) {
         navigate('/dashboard/courses');
       } else {
-        alert(error.response?.data?.message || 'Failed to enroll');
+        alert(error.response?.data?.message || error.message || 'Failed to process enrollment');
       }
     } finally {
       setEnrolling(false);
@@ -66,14 +87,16 @@ export default function CourseDetail() {
     </div>
   );
 
+  const isPaid = course.price > 0;
+
   return (
-    <div className="min-h-screen bg-surface-50 pt-24 pb-12 px-4">
+    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 pt-24 pb-12 px-4 transition-colors duration-200">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Back Button */}
         <button 
           onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 text-gray-600 hover:text-brand-600 font-semibold transition-colors w-fit mb-4"
+          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 font-semibold transition-colors w-fit mb-4"
         >
           <ArrowLeft className="w-5 h-5" /> Back
         </button>
@@ -93,39 +116,39 @@ export default function CourseDetail() {
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
-            <div className="bg-white rounded-3xl p-8 border border-surface-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 font-display">Course Curriculum</h2>
+            <div className="bg-white dark:bg-surface-900 rounded-3xl p-8 border border-surface-200 dark:border-surface-800 transition-colors">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 font-display">Course Curriculum</h2>
               {course.modules?.length > 0 ? (
                 course.modules.map((mod, idx) => (
                   <div key={idx} className="mb-6 last:mb-0">
-                    <h3 className="font-bold text-gray-900 mb-3 text-lg">{mod.title}</h3>
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 text-lg">{mod.title}</h3>
                     <div className="space-y-2">
                       {mod.lectures?.map((lec, lIdx) => (
-                        <div key={lIdx} className="flex items-center justify-between p-4 rounded-xl bg-surface-50 border border-surface-100">
+                        <div key={lIdx} className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800 border border-surface-100 dark:border-surface-700">
                           <div className="flex items-center gap-3">
-                            <PlayCircle className="w-5 h-5 text-brand-500" />
-                            <span className="font-medium text-gray-700">{lec.title}</span>
+                            <PlayCircle className="w-5 h-5 text-brand-500 dark:text-brand-400" />
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{lec.title}</span>
                           </div>
-                          <span className="text-sm text-gray-400">{lec.duration || '0m'}</span>
+                          <span className="text-sm text-gray-400 dark:text-gray-500">{lec.duration || '0m'}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">Modules are currently being updated.</p>
+                <p className="text-gray-500 dark:text-gray-400">Modules are currently being updated.</p>
               )}
             </div>
           </div>
 
           <div className="md:col-span-1">
-            <div className="sticky top-24 bg-white rounded-3xl p-6 border border-surface-200 shadow-xl text-center">
-              <div className="text-4xl font-black text-gray-900 mb-6">
-                {course.price === 0 ? 'Free' : `₹${course.price}`}
+            <div className="sticky top-24 bg-white dark:bg-surface-900 rounded-3xl p-6 border border-surface-200 dark:border-surface-800 shadow-xl text-center transition-colors">
+              <div className="text-4xl font-black text-gray-900 dark:text-white mb-6">
+                {isPaid ? `₹${course.price}` : 'Free'}
               </div>
 
               {isTeacher ? (
-                <div className="w-full bg-surface-100 text-gray-600 py-4 text-sm rounded-xl border border-surface-200 font-semibold mb-4">
+                <div className="w-full bg-surface-100 dark:bg-surface-800 text-gray-600 dark:text-gray-400 py-4 text-sm rounded-xl border border-surface-200 dark:border-surface-700 font-semibold mb-4">
                   Instructor View: Enrollment Disabled
                 </div>
               ) : (
@@ -134,12 +157,22 @@ export default function CourseDetail() {
                   disabled={enrolling || course.isEnrolled}
                   className="w-full btn-primary py-4 text-lg flex items-center justify-center gap-2 mb-4"
                 >
-                  {enrolling ? <Loader className="w-6 h-6 animate-spin"/> : course.isEnrolled ? 'Already Enrolled' : 'Enroll Now'}
+                  {enrolling 
+                    ? <Loader className="w-6 h-6 animate-spin"/> 
+                    : course.isEnrolled 
+                      ? 'Already Enrolled' 
+                      : isPaid 
+                        ? 'Start 7-Day Free Trial' 
+                        : 'Enroll for Free'}
                   {!enrolling && !course.isEnrolled && <ArrowRight className="w-5 h-5" />}
                 </button>
               )}
 
-              <p className="text-sm text-gray-500 font-medium">Full lifetime access. Learn at your own pace.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {isPaid 
+                  ? "7 days completely free. Cancel anytime before the trial ends." 
+                  : "Full lifetime access. Learn at your own pace."}
+              </p>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { courseService } from '../../services/courseService'; 
-import { Shield, Users, Database, Activity } from 'lucide-react'; // Added icons for Admin
+import { Shield, Users, Database, Activity } from 'lucide-react';
 
 export default function DashboardHome() {
   const { user } = useAuth();
@@ -12,7 +12,6 @@ export default function DashboardHome() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Admins and Teachers don't need to load student enrollments on their home page
       if (user?.role === 'admin' || user?.role === 'teacher') {
         setLoading(false);
         return;
@@ -20,11 +19,7 @@ export default function DashboardHome() {
 
       try {
         const data = await courseService.getEnrolled();
-        const formattedCourses = Array.isArray(data) ? data.map(item => {
-          const courseData = item.course || item;
-          return { ...courseData, progress: item.progress || courseData.progress || 0 };
-        }).filter(c => c && c.title) : [];
-        setEnrolledCourses(formattedCourses);
+        setEnrolledCourses(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -43,7 +38,7 @@ export default function DashboardHome() {
   }
 
   // ==========================================
-  // 🛡️ ADMIN VIEW (Completely Different UI)
+  // 🛡️ ADMIN VIEW
   // ==========================================
   if (user?.role === 'admin') {
     return (
@@ -51,13 +46,11 @@ export default function DashboardHome() {
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-2xl p-8 shadow-xl text-white flex items-center gap-4">
           <Shield className="w-12 h-12 text-brand-500" />
           <div>
-            {/* FIX: Using user.fullName instead of user.name */}
             <h1 className="text-3xl font-black font-display">Master Admin Console</h1>
             <p className="text-gray-400 mt-1">Welcome back, {user?.fullName || 'Admin'}. All systems operational.</p>
           </div>
         </div>
 
-        {/* Dummy System Metrics to look amazing on a resume screenshot */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-2xl border border-surface-200 shadow-sm flex items-center gap-4">
             <div className="p-4 bg-brand-50 text-brand-600 rounded-xl"><Users className="w-6 h-6" /></div>
@@ -80,15 +73,14 @@ export default function DashboardHome() {
   // 🎓 STUDENT / TEACHER VIEW
   // ==========================================
   
-  const totalPracticeHours = enrolledCourses.reduce((sum, course) => sum + (parseInt(course.duration) || 0), 0);
+  const totalPracticeHours = enrolledCourses.reduce((sum, item) => sum + (parseInt((item.course || item).duration) || 0), 0);
   const avgProgress = enrolledCourses.length > 0 
-    ? Math.round(enrolledCourses.reduce((sum, c) => sum + (c.progress || 0), 0) / enrolledCourses.length) : 0;
+    ? Math.round(enrolledCourses.reduce((sum, item) => sum + (item.progress || (item.course || item).progress || 0), 0) / enrolledCourses.length) : 0;
 
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="bg-gradient-to-r from-slate-900 to-slate-850 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="space-y-1">
-          {/* FIX: Using user.fullName */}
           <h2 className="text-2xl font-bold text-white">Welcome Back, {user?.fullName?.split(' ')[0] || 'User'}</h2>
           <p className="text-sm text-slate-400">
             {user?.role === 'teacher' ? 'Manage your active courses below.' : 'Your next synchronized simulated testing window opens in 14 hours.'}
@@ -102,7 +94,6 @@ export default function DashboardHome() {
       {user?.role === 'student' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* ... Keep your existing student metrics grid here ... */}
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
               <div className="text-xs text-slate-500 font-semibold uppercase">Total Track Progression</div>
               <div className="text-2xl font-bold mt-1 text-white">{avgProgress}%</div>
@@ -132,26 +123,37 @@ export default function DashboardHome() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {enrolledCourses.map(course => (
-                  <div key={course._id} className="border border-slate-800 bg-slate-950 rounded-xl p-4 hover:border-slate-700 transition-colors">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-semibold text-white">{course.title}</h4>
-                        <p className="text-xs text-slate-500">{course.category || 'Course'} Track</p>
+              <div className="space-y-3 relative z-0">
+                {enrolledCourses.map((item, index) => {
+                  const course = item.course || item;
+                  
+                  const courseId = course._id || course.id || item.courseId || `ERROR_NO_ID_${index}`;
+                  const progress = item.progress || course.progress || 0;
+                  
+                  if (!course || !course.title) return null;
+
+                  return (
+                    <div key={courseId + index} className="border border-slate-800 bg-slate-950 rounded-xl p-4 hover:border-slate-700 transition-colors relative z-10">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-semibold text-white">{course.title}</h4>
+                          <p className="text-xs text-slate-500">{course.category || 'Course'} Track</p>
+                        </div>
+                        
+                        <Link 
+                          to={`/dashboard/classroom/${courseId}`}
+                          className="relative z-50 bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg hover:bg-cyan-400 transition-all inline-block"
+                        >
+                          Resume
+                        </Link>
                       </div>
-                      <button 
-                        onClick={() => navigate(`/dashboard/classroom/${course._id}`)}
-                        className="bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-                      >
-                        Resume
-                      </button>
+                      
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 relative z-10">
+                        <div className="bg-emerald-400 h-1.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-800 rounded-full h-1.5">
-                      <div className="bg-emerald-400 h-1.5 rounded-full transition-all duration-500" style={{ width: `${course.progress || 0}%` }}></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

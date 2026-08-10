@@ -1,14 +1,16 @@
 // ============================================================
-// Navbar.jsx — Top navigation bar
+// Navbar.jsx — Top navigation bar with Dark Mode Support
 // ============================================================
 
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, ChevronDown, LayoutDashboard, BookOpen, LogOut, User } from "lucide-react";
+import { Menu, X, ChevronDown, LayoutDashboard, BookOpen, LogOut, User, Sun, Moon } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function Navbar() {
   const { user, logout, isLoggedIn } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +47,7 @@ export default function Navbar() {
   if (isDashboard) return null;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-surface-200 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-surface-900/90 backdrop-blur-md border-b border-surface-200 dark:border-surface-800 shadow-sm transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
@@ -53,10 +55,9 @@ export default function Navbar() {
             <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-glow transition-all">
               <span className="text-white font-bold text-sm font-mono">NP</span>
             </div>
-            <span className="text-xl font-bold text-gray-900 font-display">NexusPrep</span>
+            <span className="text-xl font-bold text-gray-900 dark:text-white font-display">NexusPrep</span>
           </Link>
 
-          {/* 🔥 FIXED: Now pointing to actual pages instead of hash links */}
           <div className="hidden md:flex items-center gap-1">
             <NavItem to="/catalog" label="Courses" />
             <NavItem to="/features" label="Features" />
@@ -64,32 +65,37 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="p-2 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-800 text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Moon className="w-5 h-5 text-gray-600" />
+              )}
+            </button>
+
             {isLoggedIn ? (
               <div className="relative" ref={dropdownRef}>
+                {/* 🔥 FIXED: Replaced long pill button with clean circular avatar */}
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-2 bg-surface-50 border border-surface-200 hover:border-brand-300 rounded-full py-1.5 pl-1.5 pr-3 transition-all"
+                  className="w-9 h-9 ml-2 bg-brand-600 rounded-full flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm overflow-hidden border-2 border-brand-100 dark:border-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
                 >
-                  
-                  <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center shadow-sm overflow-hidden border border-brand-200">
-                    {user?.avatar ? (
-                      <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-white text-xs font-bold">{initial}</span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col text-left hidden sm:flex">
-                    <span className="text-sm font-bold text-gray-900 leading-none truncate max-w-[100px]">{firstName}</span>
-                    <span className="text-[10px] text-brand-600 font-bold uppercase tracking-wider leading-none mt-0.5">{userRole}</span>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white text-sm font-bold">{initial}</span>
+                  )}
                 </button>
 
                 {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-surface-200 py-2 z-50 animate-fade-in">
-                    <div className="px-4 py-2 border-b border-surface-100 mb-1">
-                      <p className="text-sm font-semibold text-gray-900">{safeName}</p>
+                  <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-surface-800 rounded-2xl shadow-xl border border-surface-200 dark:border-surface-800 py-2 z-50 animate-fade-in">
+                    <div className="px-4 py-2 border-b border-surface-100 dark:border-surface-800 mb-1">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{safeName}</p>
                       <p className="text-xs text-gray-400 truncate">{user?.email || "No email"}</p>
                     </div>
                     <DropItem icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" onClick={() => { navigate("/dashboard"); setProfileOpen(false); }} />
@@ -101,7 +107,7 @@ export default function Navbar() {
                       onClick={() => { navigate("/dashboard/settings"); setProfileOpen(false); }} 
                     />
                     
-                    <div className="border-t border-surface-100 mt-1 pt-1">
+                    <div className="border-t border-surface-100 dark:border-surface-800 mt-1 pt-1">
                       <DropItem icon={<LogOut className="w-4 h-4" />} label="Logout" onClick={handleLogout} danger />
                     </div>
                   </div>
@@ -115,16 +121,29 @@ export default function Navbar() {
             )}
           </div>
 
-          <button className="md:hidden p-2 rounded-lg" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="p-2 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-800 text-gray-600 dark:text-gray-300"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Moon className="w-5 h-5 text-gray-600" />
+              )}
+            </button>
+
+            <button className="p-2 rounded-lg text-gray-700 dark:text-gray-200" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
       {menuOpen && (
-        <div className="md:hidden bg-white border-t border-surface-200 px-4 py-4 space-y-2">
+        <div className="md:hidden bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-800 px-4 py-4 space-y-2">
           <MobileNavItem to="/catalog" label="Courses" onClick={() => setMenuOpen(false)} />
-          {/* 🔥 FIXED MOBILE MENU AS WELL */}
           <MobileNavItem to="/features" label="Features" onClick={() => setMenuOpen(false)} />
           <MobileNavItem to="/success-stories" label="Success Stories" onClick={() => setMenuOpen(false)} />
           
@@ -146,7 +165,7 @@ export default function Navbar() {
 
 function NavItem({ to, label }) {
   return (
-    <Link to={to} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-all">
+    <Link to={to} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-surface-800 transition-all">
       {label}
     </Link>
   );
@@ -156,7 +175,7 @@ function DropItem({ icon, label, onClick, danger }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium hover:bg-surface-50 transition-all ${danger ? "text-red-500" : "text-gray-700"}`}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium hover:bg-surface-50 dark:hover:bg-surface-800 transition-all ${danger ? "text-red-500" : "text-gray-700 dark:text-gray-200"}`}
     >
       {icon} {label}
     </button>
@@ -165,7 +184,7 @@ function DropItem({ icon, label, onClick, danger }) {
 
 function MobileNavItem({ to, label, onClick }) {
   return (
-    <Link to={to} onClick={onClick} className="block px-4 py-3 text-gray-700 font-medium hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all">
+    <Link to={to} onClick={onClick} className="block px-4 py-3 text-gray-700 dark:text-gray-200 font-medium hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-surface-800 rounded-xl transition-all">
       {label}
     </Link>
   ); 

@@ -7,7 +7,10 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { font-family: 'DM Sans', sans-serif; @apply bg-surface-50 text-gray-800 antialiased; }
+  body { 
+    font-family: 'DM Sans', sans-serif; 
+    @apply bg-surface-50 text-gray-800 dark:bg-surface-950 dark:text-gray-100 antialiased transition-colors duration-200; 
+  }
 }
 
 @layer components {
@@ -15,23 +18,26 @@
     @apply inline-flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl px-6 py-3 transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 border-2 border-brand-500 text-brand-600 hover:bg-brand-50 font-semibold rounded-xl px-6 py-3 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 border-2 border-brand-500 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:text-brand-400 font-semibold rounded-xl px-6 py-3 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 text-gray-600 hover:text-brand-600 hover:bg-brand-50 font-medium rounded-xl px-4 py-2.5 transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-surface-800 font-medium rounded-xl px-4 py-2.5 transition-all duration-200;
   }
   .card {
-    @apply bg-white rounded-2xl border border-surface-200 transition-all duration-300;
+    @apply bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 transition-all duration-300;
     box-shadow: 0 2px 20px rgba(99,102,241,0.08);
   }
   .card:hover {
     box-shadow: 0 8px 40px rgba(99,102,241,0.16);
   }
+  
+  /* 🔥 FIXED: Replaced dark:border-surface-700 with dark:border-surface-800 */
   .input {
-    @apply w-full bg-surface-100 border border-surface-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all duration-200 text-sm;
+    @apply w-full bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-800 rounded-xl px-4 py-3 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all duration-200 text-sm;
   }
+  
   .nav-link {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 font-medium text-sm hover:bg-brand-50 hover:text-brand-600 transition-all duration-200 cursor-pointer;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 font-medium text-sm hover:bg-brand-50 dark:hover:bg-surface-800 hover:text-brand-600 dark:hover:text-brand-400 transition-all duration-200 cursor-pointer;
   }
   .nav-link-active {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-600 text-white font-medium text-sm transition-all duration-200 cursor-pointer;
@@ -39,7 +45,7 @@
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  .progress-bar  { @apply h-2 rounded-full bg-surface-200 overflow-hidden; }
+  .progress-bar  { @apply h-2 rounded-full bg-surface-200 dark:bg-surface-800 overflow-hidden; }
   .progress-fill { @apply h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all duration-700; }
 }
 
@@ -56,3 +62,7 @@
 ::-webkit-scrollbar-track { background: #f1f3f8; }
 ::-webkit-scrollbar-thumb { background: #c7d7ff; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #8194ff; }
+
+.dark ::-webkit-scrollbar-track { background: #13172a; }
+.dark ::-webkit-scrollbar-thumb { background: #312e81; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4338ca; }

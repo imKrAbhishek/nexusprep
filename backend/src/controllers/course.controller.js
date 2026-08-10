@@ -1,7 +1,7 @@
-// backend/src/controllers/course.controller.js
 const asyncHandler  = require('../utils/asyncHandler');
 const courseService = require('../services/course.service');
-const Course = require('../models/Course'); // Safely import model for deletion
+const Course = require('../models/Course'); 
+const Enrollment = require('../models/Enrollment');
 
 // ─── STUDENT CONTROLLERS ─────────────────────
 const getCourses = asyncHandler(async (req,res) => {
@@ -40,12 +40,43 @@ const getMyEnrollments = asyncHandler(async (req,res) => {
   res.status(200).json({success:true,results:courses.length,data:{courses}});
 });
 
-const updateProgress = asyncHandler(async (req,res) => {
-  const {lectureId} = req.body;
-  if (!lectureId) return res.status(400).json({success:false,message:'lectureId is required'});
-  const enrollment = await courseService.updateProgress(req.params.id, req.user._id, lectureId);
-  res.status(200).json({success:true,message:'Progress updated',data:{enrollment}});
-});
+// 🔥 THE FIX: Calculates the exact percentage and updates the progress bar
+const updateProgress = async (req, res) => {
+  try {
+    const { courseId, lectureId } = req.body;
+    const userId = req.user._id;
+
+    const enrollment = await Enrollment.findOne({ student: userId, course: courseId });
+    if (!enrollment) return res.status(404).json({ message: 'Enrollment not found' });
+
+    const courseDoc = await Course.findById(courseId);
+    if (!courseDoc) return res.status(404).json({ message: 'Course not found' });
+
+    // Calculate total lectures in the course
+    let totalLectures = 0;
+    courseDoc.modules.forEach(mod => {
+      totalLectures += (mod.lectures ? mod.lectures.length : 0);
+    });
+
+    // Add lecture to completed list and update percentage
+    if (!enrollment.completedLectures.includes(lectureId)) {
+      enrollment.completedLectures.push(lectureId);
+      
+      // Calculate progress percentage
+      enrollment.progress = totalLectures > 0 
+        ? Math.round((enrollment.completedLectures.length / totalLectures) * 100) 
+        : 0;
+
+      await enrollment.save();
+    }
+
+    res.status(200).json({ success: true, message: 'Progress recorded!' });
+    
+  } catch (error) {
+    console.error('Progress Update Error:', error);
+    res.status(500).json({ message: 'Failed to update progress' });
+  }
+};
 
 // ─── ADMIN CONTROLLERS ─────────────────────────
 const getAdminCourses = asyncHandler(async (req,res) => {
@@ -75,10 +106,6 @@ const createCourse = async (req, res) => {
       data: { course }
     });
   } catch (error) {
-    console.error("\n=== 🔥 MONGOOSE REJECTION DETAILS ===");
-    console.error(error);
-    console.error("=====================================\n");
-
     res.status(500).json({
       success: false,
       message: error.message || 'Database validation failed',
@@ -92,27 +119,14 @@ const updateCourse = asyncHandler(async (req,res) => {
   res.status(200).json({success:true,message:'Course updated',data:{course}});
 });
 
-// 🔥 THE NEW DELETE FUNCTION
 const deleteCourse = asyncHandler(async (req, res) => {
   const course = await courseService.getAdminCourseById(req.params.id);
   
-  if (!course) {
-    return res.status(404).json({ success: false, message: 'Course not found' });
-  }
-
-  if (course.isPublished) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Cannot delete a published course. Please unpublish it first.' 
-    });
-  }
+  if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+  if (course.isPublished) return res.status(400).json({ success: false, message: 'Cannot delete a published course. Please unpublish it first.' });
 
   await Course.findByIdAndDelete(req.params.id);
-
-  res.status(200).json({ 
-    success: true, 
-    message: 'Draft course deleted successfully' 
-  });
+  res.status(200).json({ success: true, message: 'Draft course deleted successfully' });
 });
 
 const publishCourse = asyncHandler(async (req,res) => {
@@ -150,7 +164,6 @@ const deleteLecture = asyncHandler(async (req,res) => {
   res.status(200).json({success:true,...result});
 });
 
-// 🔥 EXPORTING DELETE COURSE
 module.exports = {
   getCourses, getCourseById, enrollInCourse, getMyEnrollments, updateProgress,
   getAdminCourses, getAdminCourseById, createCourse, updateCourse, deleteCourse, publishCourse,

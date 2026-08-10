@@ -14,7 +14,9 @@ const {
 // Student Enrollments
 router.get('/enrollments/me', protect, getMyEnrollments);
 router.post('/enrollments', protect, enrollInCourse);
-router.patch('/enrollments/:id/progress', protect, updateProgress);
+
+// 🔥 THE FIX: Changed to POST and removed the parameter so it catches the body payload
+router.post('/enrollments/progress', protect, updateProgress);
 
 // Reusable Middleware Array for Teachers/Admins
 const teacherOnly = [protect, restrictTo('admin', 'teacher')];
@@ -23,7 +25,7 @@ const teacherOnly = [protect, restrictTo('admin', 'teacher')];
 router.get('/admin', teacherOnly, getAdminCourses);
 router.get('/admin/:id', teacherOnly, getAdminCourseById);
 
-// 🔥 THE FIX: Added '/admin' to all content management routes to match frontend
+// Admin content management routes
 router.patch('/admin/:id/publish', teacherOnly, publishCourse);
 
 // Modules

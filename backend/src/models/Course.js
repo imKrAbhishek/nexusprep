@@ -27,7 +27,6 @@ const courseSchema = new mongoose.Schema(
     category:    { 
       type: String, 
       required: true, 
-      // 🔥 FIX: Expanded the enum to match your frontend dropdown options exactly
       enum: [
         'JEE', 
         'JEE Mains', 
@@ -42,14 +41,22 @@ const courseSchema = new mongoose.Schema(
         'General'
       ] 
     },
-    level:       { type: String, enum: ['Beginner','Intermediate','Advanced'], default: 'Beginner' },
-    price:       { type: Number, required: true, min: 0 },
+    level:         { type: String, enum: ['Beginner','Intermediate','Advanced'], default: 'Beginner' },
+    price:         { type: Number, required: true, min: 0, default: 0 },
     originalPrice: { type: Number, min: 0 },
-    duration:    { type: String, default: '0 hrs' },
-    tags:        [{ type: String, trim: true }],
-    modules:     [moduleSchema],
-    thumbnail:   { type: String, default: null },
-    color:       { type: String, default: 'from-brand-500 to-purple-600' },
+    
+    // 🔥 NEW: Payment & Trial Fields
+    isPaid:        { type: Boolean, default: false },
+    hasTrial:      { type: Boolean, default: true },
+    trialDays:     { type: Number, default: 7 },
+    stripeProductId: { type: String, default: null },
+    stripePriceId:   { type: String, default: null },
+
+    duration:      { type: String, default: '0 hrs' },
+    tags:          [{ type: String, trim: true }],
+    modules:       [moduleSchema],
+    thumbnail:     { type: String, default: null },
+    color:         { type: String, default: 'from-brand-500 to-purple-600' },
     totalStudents: { type: Number, default: 0 },
     totalReviews:  { type: Number, default: 0 },
     averageRating: { type: Number, default: 0, min: 0, max: 5 },
@@ -73,6 +80,10 @@ courseSchema.virtual('discountPercent').get(function () {
 courseSchema.pre('save', function (next) {
   if (this.isModified('title') && !this.slug) {
     this.slug = this.title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').slice(0,60);
+  }
+  // Auto-set isPaid based on price
+  if (this.isModified('price')) {
+    this.isPaid = this.price > 0;
   }
   next();
 });
